@@ -3,5 +3,5 @@ Include/
 Lib/
 Scripts/
 share/
-pyenv.cfg
+pyvenv.cfg
 treningi_historia.csv
