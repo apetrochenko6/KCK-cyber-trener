@@ -24,7 +24,6 @@ except (ImportError, AttributeError):
     import mediapipe.solutions.pose as mp_pose
     import mediapipe.solutions.drawing_utils as mp_drawing
 
-
 class PersonalTrainerApp:
     def __init__(self, window):
         self.last_spoken_text = ""
@@ -32,11 +31,12 @@ class PersonalTrainerApp:
         self.engine = pyttsx3.init()
         self.tts_queue = queue.Queue()
 
-
         self.window = window
         self.window.after(100, self.process_tts_queue)
-        self.window.title("Trener Personalny - Indeks: 255693")
-        self.window.geometry("1000x750")
+        self.window.title("Trener Personalny")
+        self.window.geometry("1100x750")
+        self.window.configure(bg="#2B2B2B")
+
         # Zmienne treningowe
         self.counter = 0                   # licznik właściwego treningu
         self.stage = None
@@ -58,53 +58,108 @@ class PersonalTrainerApp:
         self.cap = None
         self.pose = None
 
-        # GUI
+        # =========================
+        # DESIGN & LAYOUT
+        # =========================
+        # Style constants
+        BG_COLOR = "#2B2B2B"
+        PANEL_COLOR = "#333333"
+        TEXT_COLOR = "#FFFFFF"
+        ACCENT_COLOR = "#4CAF50"  # Green
+        DANGER_COLOR = "#F44336"  # Red
+        INFO_COLOR = "#2196F3"  # Blue
+        FONT_TITLE = ("Segoe UI", 20, "bold")
+        FONT_NORMAL = ("Segoe UI", 12)
+        FONT_BTN = ("Segoe UI", 12, "bold")
+
+        # Top Bar
+        top_frame = tk.Frame(window, bg=BG_COLOR)
+        top_frame.pack(fill=tk.X, pady=(20, 10))
+
         self.label = tk.Label(
-            window,
-            text="System Analizy Przysiadów Sumo",
-            font=("Arial", 16, "bold")
+            top_frame,
+            text="SYSTEM ANALIZY PRZYSIADÓW SUMO",
+            font=FONT_TITLE,
+            bg=BG_COLOR,
+            fg=ACCENT_COLOR
         )
-        self.label.pack(pady=10)
+        self.label.pack()
 
         self.status_label = tk.Label(
-            window,
+            top_frame,
             text="Oczekuję na komendę głosową 'start' lub 'stop'",
-            fg="blue"
+            font=FONT_NORMAL,
+            bg=BG_COLOR,
+            fg="#AAAAAA"
         )
         self.status_label.pack(pady=5)
 
+        # Main Content Container
+        main_frame = tk.Frame(window, bg=BG_COLOR)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        # Left Panel (Controls)
+        left_panel = tk.Frame(main_frame, bg=PANEL_COLOR, bd=0, highlightbackground="#444444", highlightthickness=1)
+        left_panel.pack(side=tk.LEFT, fill=tk.Y, ipadx=20, ipady=20)
+
+        controls_label = tk.Label(left_panel, text="PANEL STEROWANIA", font=("Segoe UI", 14, "bold"), bg=PANEL_COLOR, fg=TEXT_COLOR)
+        controls_label.pack(pady=(20, 30))
+
         tk.Button(
-            window,
-            text="START TRENINGU",
+            left_panel,
+            text="▶ START TRENINGU",
             command=self.start_training,
-            bg="green",
-            fg="white",
-            width=20
-        ).pack(pady=5)
+            bg=ACCENT_COLOR,
+            fg=TEXT_COLOR,
+            font=FONT_BTN,
+            width=20,
+            height=2,
+            relief="flat",
+            cursor="hand2",
+            activebackground="#45a049",
+            activeforeground="white"
+        ).pack(pady=10, padx=20)
 
         tk.Button(
-            window,
-            text="STOP / ZAPISZ",
+            left_panel,
+            text="⏹ STOP / ZAPISZ",
             command=self.stop_training,
-            bg="red",
-            fg="white",
-            width=20
-        ).pack(pady=5)
+            bg=DANGER_COLOR,
+            fg=TEXT_COLOR,
+            font=FONT_BTN,
+            width=20,
+            height=2,
+            relief="flat",
+            cursor="hand2",
+            activebackground="#da190b",
+            activeforeground="white"
+        ).pack(pady=10, padx=20)
 
         tk.Button(
-            window,
+            left_panel,
             text="POKAŻ STATYSTYKI",
             command=self.show_stats,
-            width=20
-        ).pack(pady=5)
+            bg=INFO_COLOR,
+            fg=TEXT_COLOR,
+            font=FONT_BTN,
+            width=20,
+            height=2,
+            relief="flat",
+            cursor="hand2",
+            activebackground="#0b7dda",
+            activeforeground="white"
+        ).pack(pady=10, padx=20)
 
-        self.video_label = tk.Label(window)
-        self.video_label.pack(pady=10)
+        # Right Panel (Video)
+        right_panel = tk.Frame(main_frame, bg="#000000", bd=2, relief="flat")
+        right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(20, 0))
+
+        self.video_label = tk.Label(right_panel, bg="#000000", text="KAMERA WYŁĄCZONA", font=("Segoe UI", 16), fg="#555555")
+        self.video_label.pack(expand=True)
 
         # Wątek głosowy
         self.voice_thread = threading.Thread(target=self.voice_listener, daemon=True)
         self.voice_thread.start()
-
     # =========================
     # GŁOS / VOSK
     # =========================
