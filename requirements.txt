@@ -1,0 +1,8 @@
+mediapipe==0.10.11
+opencv-python
+numpy
+matplotlib
+Pillow
+pyttsx3
+sounddevice
+vosk
