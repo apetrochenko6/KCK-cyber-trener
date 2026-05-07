@@ -29,13 +29,13 @@ Zalecane środowisko: **Python 3.11.x**.
 1. Sklonuj repozytorium lub pobierz pliki projektu.
 2. Stwórz i aktywuj środowisko wirtualne:
    ```bash
-  py -3.11 -m venv .venv
+   py -3.11 -m venv .venv
    .\\.venv\\Scripts\\activate
 3. Zainstaluj wymagane pakiety z pliku zależności:
 
-Bash
-pip install -r requirements.tx
+   ```bash
+   pip install -r requirements.tx
 4. Aby uruchomić aplikację, upewnij się, że Twoje środowisko .venv jest aktywne, a następnie wpisz w terminalu:
 
-Bash
-python main.py
+   ```bash
+   python main.py
