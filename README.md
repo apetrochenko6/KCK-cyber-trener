@@ -34,7 +34,7 @@ Zalecane środowisko: **Python 3.11.x**.
 3. Zainstaluj wymagane pakiety z pliku zależności:
 
    ```bash
-   pip install -r requirements.tx
+   pip install -r requirements.txt
 4. Aby uruchomić aplikację, upewnij się, że Twoje środowisko .venv jest aktywne, a następnie wpisz w terminalu:
 
    ```bash
