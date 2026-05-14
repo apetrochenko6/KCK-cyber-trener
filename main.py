@@ -2,144 +2,200 @@ import tkinter as tk
 from tkinter import messagebox
 import cv2
 from PIL import Image, ImageTk
+import sys
 
-# Importowanie naszych nowych modułów
+# Importowanie modułów logicznych
 from training_data import TrainingData
 from vision_processor import VisionProcessor, mp_pose
 from audio_engine import AudioEngine
 
 
 class PersonalTrainerApp:
-    """Główna klasa GUI (Widok i Kontroler logiczny dla treningu)."""
-
     def __init__(self, window):
-        self.window = window
-        self.window.title("Trener Personalny")
-        self.window.geometry("1100x750")
-        self.window.configure(bg="#2B2B2B")
+        if sys.version_info.major != 3 or sys.version_info.minor != 11:
+            print("BŁĄD: Projekt wymaga Pythona 3.11.x")
+            sys.exit(1)
 
-        # Inicjalizacja modułów
+        self.window = window
+        self.window.title("AI SUMO TRAINER")
+        self.window.geometry("1280x800")
+
+        self.is_dark = True
+        self.stat_cards = []  # Przechowuje referencje do kart statystyk dla zmiany motywu
+
         self.data_manager = TrainingData()
         self.vision = VisionProcessor()
         self.audio = AudioEngine(self.window, self.start_training, self.stop_training)
 
-        # Zmienne treningowe
         self.counter = 0
         self.stage = None
         self.is_running = False
-
-        # Kalibracja
-        self.calibration_reps = 3
-        self.calibration_count = 0
-        self.calibration_angles = []
         self.calibration_done = False
         self.target_depth = 90.0
-        self.current_min_angle = 180.0
 
-        # Zmienne wizyjne
         self.cap = None
         self.pose = None
 
-        self._setup_ui()
+        self._setup_styles()
+        self.window.configure(bg=self.colors["bg"])
+        self._create_layout()
 
-    def _setup_ui(self):
-        BG_COLOR = "#2B2B2B"
-        PANEL_COLOR = "#333333"
-        TEXT_COLOR = "#FFFFFF"
-        ACCENT_COLOR = "#4CAF50"
-        DANGER_COLOR = "#F44336"
-        INFO_COLOR = "#2196F3"
-        FONT_TITLE = ("Segoe UI", 20, "bold")
-        FONT_NORMAL = ("Segoe UI", 12)
-        FONT_BTN = ("Segoe UI", 12, "bold")
+    def _setup_styles(self):
+        """Definicja palet kolorów dla trybu jasnego i ciemnego."""
+        self.palettes = {
+            "dark": {
+                "bg": "#121212", "card": "#1E1E1E", "card_inner": "#252526",
+                "accent": "#00E676", "danger": "#FF5252", "info": "#2979FF",
+                "text": "#FFFFFF", "text_dim": "#B0B0B0"
+            },
+            "light": {
+                "bg": "#F5F7FA", "card": "#FFFFFF", "card_inner": "#E4E7EB",
+                "accent": "#00C853", "danger": "#D50000", "info": "#2962FF",
+                "text": "#212121", "text_dim": "#5F6368"
+            }
+        }
+        self.colors = self.palettes["dark"]
 
-        top_frame = tk.Frame(self.window, bg=BG_COLOR)
-        top_frame.pack(fill=tk.X, pady=(20, 10))
+        self.fonts = {
+            "title": ("Segoe UI", 24, "bold"),
+            "header": ("Segoe UI", 14, "bold"),
+            "stat_val": ("Segoe UI", 32, "bold"),
+            "stat_label": ("Segoe UI", 10),
+            "btn": ("Segoe UI", 11, "bold")
+        }
 
-        tk.Label(top_frame, text="SYSTEM ANALIZY PRZYSIADÓW SUMO",
-                 font=FONT_TITLE, bg=BG_COLOR, fg=ACCENT_COLOR).pack()
+    def toggle_theme(self):
+        """Płynnie przełącza kolory całego interfejsu."""
+        self.is_dark = not self.is_dark
+        self.colors = self.palettes["dark"] if self.is_dark else self.palettes["light"]
 
-        self.status_label = tk.Label(top_frame, text="Oczekuję na komendę głosową 'start' lub 'stop'",
-                                     font=FONT_NORMAL, bg=BG_COLOR, fg="#AAAAAA")
-        self.status_label.pack(pady=5)
+        # Aktualizacja głównych kontenerów
+        self.window.configure(bg=self.colors["bg"])
+        self.sidebar.configure(bg=self.colors["card"])
+        self.main_content.configure(bg=self.colors["bg"])
+        self.video_container.configure(highlightbackground=self.colors["card_inner"])
+        self.status_bar.configure(bg=self.colors["card"])
 
-        main_frame = tk.Frame(self.window, bg=BG_COLOR)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        # Aktualizacja tekstów
+        self.title_label.configure(bg=self.colors["card"])
+        self.subtitle_label.configure(bg=self.colors["card"], fg=self.colors["text_dim"])
+        self.student_label.configure(bg=self.colors["card"])
+        self.status_text.configure(bg=self.colors["card"], fg=self.colors["text_dim"])
+        self.video_label.configure(fg=self.colors["card_inner"])
 
-        left_panel = tk.Frame(main_frame, bg=PANEL_COLOR, bd=0,
-                              highlightbackground="#444444", highlightthickness=1)
-        left_panel.pack(side=tk.LEFT, fill=tk.Y, ipadx=20, ipady=20)
+        # Aktualizacja kart
+        for card, title, val in self.stat_cards:
+            card.configure(bg=self.colors["card_inner"])
+            title.configure(bg=self.colors["card_inner"], fg=self.colors["text_dim"])
+            val.configure(bg=self.colors["card_inner"], fg=self.colors["text"])
 
-        tk.Label(left_panel, text="PANEL STEROWANIA", font=("Segoe UI", 14, "bold"),
-                 bg=PANEL_COLOR, fg=TEXT_COLOR).pack(pady=(20, 30))
+        # Aktualizacja przycisku motywu
+        self.btn_theme.configure(
+            text="☀️ TRYB JASNY" if self.is_dark else "🌙 TRYB CIEMNY",
+            bg="#333333" if self.is_dark else "#E0E0E0",
+            fg="#FFFFFF" if self.is_dark else "#000000"
+        )
 
-        tk.Button(left_panel, text="▶ START TRENINGU", command=self.start_training,
-                  bg=ACCENT_COLOR, fg=TEXT_COLOR, font=FONT_BTN, width=20, height=2,
-                  relief="flat", cursor="hand2", activebackground="#45a049").pack(pady=10, padx=20)
+    def _create_layout(self):
+        self.sidebar = tk.Frame(self.window, bg=self.colors["card"], width=300)
+        self.sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        self.sidebar.pack_propagate(False)
 
-        tk.Button(left_panel, text="⏹ STOP / ZAPISZ", command=self.stop_training,
-                  bg=DANGER_COLOR, fg=TEXT_COLOR, font=FONT_BTN, width=20, height=2,
-                  relief="flat", cursor="hand2", activebackground="#da190b").pack(pady=10, padx=20)
+        self.title_label = tk.Label(self.sidebar, text="SUMO AI", font=self.fonts["title"],
+                                    bg=self.colors["card"], fg=self.colors["accent"])
+        self.title_label.pack(pady=(40, 5))
 
-        tk.Button(left_panel, text="POKAŻ STATYSTYKI", command=self.data_manager.show_stats,
-                  bg=INFO_COLOR, fg=TEXT_COLOR, font=FONT_BTN, width=20, height=2,
-                  relief="flat", cursor="hand2", activebackground="#0b7dda").pack(pady=10, padx=20)
+        self.subtitle_label = tk.Label(self.sidebar, text="PERSONAL TRAINER v2.0", font=("Segoe UI", 8),
+                                       bg=self.colors["card"], fg=self.colors["text_dim"])
+        self.subtitle_label.pack()
 
-        right_panel = tk.Frame(main_frame, bg="#000000", bd=2, relief="flat")
-        right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(20, 0))
+        tk.Frame(self.sidebar, bg="#888888", height=1).pack(fill=tk.X, padx=30, pady=20)
 
-        self.video_label = tk.Label(right_panel, bg="#000000", text="KAMERA WYŁĄCZONA",
-                                    font=("Segoe UI", 16), fg="#555555")
-        self.video_label.pack(expand=True)
+        self._create_stat_card(self.sidebar, "POWTÓRZENIA", "0", "counter_label")
+        self._create_stat_card(self.sidebar, "CEL (KĄT)", "--", "target_label")
+
+        self.btn_start = self._create_nav_button("ROZPOCZNIJ SESJĘ", self.colors["accent"], self.start_training)
+        self.btn_stop = self._create_nav_button("ZAKOŃCZ I ZAPISZ", self.colors["danger"], self.stop_training)
+        self._create_nav_button("HISTORIA TRENINGÓW", self.colors["info"], self.data_manager.show_stats)
+
+        # Przycisk zmiany motywu
+        self.btn_theme = tk.Button(self.sidebar, text="☀️ TRYB JASNY", command=self.toggle_theme,
+                                   bg="#333333", fg="white", font=("Segoe UI", 10, "bold"), relief="flat",
+                                   cursor="hand2")
+        self.btn_theme.pack(pady=20, padx=30, fill=tk.X)
+
+        self.student_label = tk.Label(self.sidebar, text="Projekt Zespołowy - KCK", font=("Segoe UI", 9),
+                                      bg=self.colors["card"], fg="#888888")
+        self.student_label.pack(side=tk.BOTTOM, pady=20)
+
+        self.main_content = tk.Frame(self.window, bg=self.colors["bg"])
+        self.main_content.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=40, pady=40)
+
+        self.video_container = tk.Frame(self.main_content, bg="#000000", bd=2, highlightthickness=2,
+                                        highlightbackground=self.colors["card_inner"])
+        self.video_container.pack(fill=tk.BOTH, expand=True)
+
+        self.video_label = tk.Label(self.video_container, bg="#000000", text="KAMERA GOTOWA",
+                                    font=self.fonts["header"], fg=self.colors["card_inner"])
+        self.video_label.pack(fill=tk.BOTH, expand=True)
+
+        self.status_bar = tk.Frame(self.main_content, bg=self.colors["card"], height=40)
+        self.status_bar.pack(fill=tk.X, pady=(20, 0))
+        self.status_text = tk.Label(self.status_bar, text="OCZEKIWANIE NA KOMENDĘ GŁOSOWĄ...",
+                                    font=("Segoe UI", 10), bg=self.colors["card"], fg=self.colors["text_dim"])
+        self.status_text.pack(side=tk.LEFT, padx=20)
+
+    def _create_stat_card(self, parent, label, value, attr_name):
+        card = tk.Frame(parent, bg=self.colors["card_inner"], padx=15, pady=15)
+        card.pack(fill=tk.X, padx=30, pady=10)
+
+        l_title = tk.Label(card, text=label, font=self.fonts["stat_label"], bg=self.colors["card_inner"],
+                           fg=self.colors["text_dim"])
+        l_title.pack(anchor="w")
+
+        l_val = tk.Label(card, text=value, font=self.fonts["stat_val"], bg=self.colors["card_inner"],
+                         fg=self.colors["text"])
+        l_val.pack(anchor="w")
+
+        setattr(self, attr_name, l_val)
+        self.stat_cards.append((card, l_title, l_val))
+
+    def _create_nav_button(self, text, color, command):
+        btn = tk.Button(self.sidebar, text=text, command=command, bg=color, fg="white",
+                        font=self.fonts["btn"], relief="flat", cursor="hand2", bd=0, width=22, height=2)
+        btn.pack(pady=8, padx=30)
+        return btn
 
     def start_training(self):
-        if self.is_running:
-            return
-
+        if self.is_running: return
         self.cap = cv2.VideoCapture(0)
         if not self.cap.isOpened():
-            messagebox.showerror("Błąd", "Nie udało się otworzyć kamery.")
+            messagebox.showerror("Błąd", "Nie znaleziono kamery.")
             return
 
-        self.is_running = True
-        self.counter = 0
-        self.stage = None
-        self.calibration_count = 0
-        self.calibration_angles = []
-        self.calibration_done = False
-        self.current_min_angle = 180.0
+        self.is_running, self.counter, self.calibration_done = True, 0, False
+        self.counter_label.config(text="0")
+        self.target_label.config(text="CALIB")
 
         self.pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
-
-        self.status_label.config(text="Trening trwa...", fg="green")
-        self.audio.speak("Trening rozpoczęty. Pierwsze trzy powtórzenia to kalibracja.")
+        self.status_text.config(text="SESJA AKTYWNA: TRWA KALIBRACJA", fg=self.colors["accent"])
+        self.audio.speak("Rozpoczynamy. Wykonaj trzy powtórzenia kalibracyjne.")
         self.process_video()
 
     def stop_training(self):
-        if not self.is_running:
-            return
-
+        if not self.is_running: return
         self.is_running = False
-        self.status_label.config(text="Trening zatrzymany.", fg="red")
+        self.status_text.config(text="ZAKOŃCZONO TRENING", fg=self.colors["danger"])
 
-        if self.cap:
-            self.cap.release()
-            self.cap = None
-
-        if self.pose:
-            self.pose.close()
-            self.pose = None
+        if self.cap: self.cap.release()
+        if self.pose: self.pose.close()
 
         self.data_manager.save_to_csv(self.counter)
-        msg = self.data_manager.get_progression_message(self.counter)
-        self.audio.speak(msg)
-
-        messagebox.showinfo("Zapisano", f"Trening zapisany w pliku: {self.data_manager.history_file}")
+        self.audio.speak(self.data_manager.get_progression_message(self.counter))
+        messagebox.showinfo("Sesja zapisana", f"Twój wynik: {self.counter}")
 
     def process_video(self):
-        if not self.is_running or self.cap is None or self.pose is None:
-            return
-
+        if not self.is_running or not self.cap: return
         ret, frame = self.cap.read()
         if not ret:
             self.window.after(10, self.process_video)
@@ -154,40 +210,38 @@ class PersonalTrainerApp:
             lm = results.pose_landmarks.landmark
             self._handle_pose_logic(image, lm, results)
 
-        image_rgb_to_show = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        imgtk = ImageTk.PhotoImage(image=Image.fromarray(image_rgb_to_show))
+        imgtk = ImageTk.PhotoImage(image=Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB)))
         self.video_label.imgtk = imgtk
         self.video_label.configure(image=imgtk)
-
-        if self.is_running:
-            self.window.after(10, self.process_video)
+        self.window.after(10, self.process_video)
 
     def _handle_pose_logic(self, image, lm, results):
-        left_hip = [lm[mp_pose.PoseLandmark.LEFT_HIP.value].x, lm[mp_pose.PoseLandmark.LEFT_HIP.value].y]
-        left_knee = [lm[mp_pose.PoseLandmark.LEFT_KNEE.value].x, lm[mp_pose.PoseLandmark.LEFT_KNEE.value].y]
-        left_ankle = [lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].x, lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
+        if not self.vision.check_visibility(lm):
+            cv2.putText(image, "SKORYGUJ POZYCJE (POZA KADREM)", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255),
+                        2)
+            return
 
-        right_ankle_x = lm[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x
-        left_ankle_x = lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].x
-        right_hip_x = lm[mp_pose.PoseLandmark.RIGHT_HIP.value].x
-        left_hip_x = lm[mp_pose.PoseLandmark.LEFT_HIP.value].x
+        hip = [lm[mp_pose.PoseLandmark.LEFT_HIP.value].x, lm[mp_pose.PoseLandmark.LEFT_HIP.value].y,
+               lm[mp_pose.PoseLandmark.LEFT_HIP.value].z]
+        knee = [lm[mp_pose.PoseLandmark.LEFT_KNEE.value].x, lm[mp_pose.PoseLandmark.LEFT_KNEE.value].y,
+                lm[mp_pose.PoseLandmark.LEFT_KNEE.value].z]
+        ankle = [lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].x, lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].y,
+                 lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].z]
 
-        angle = self.vision.calculate_angle(left_hip, left_knee, left_ankle)
-        is_sumo = abs(left_ankle_x - right_ankle_x) > abs(left_hip_x - right_hip_x) * 1.5
-        ar_color = (0, 255, 0)
+        raw_angle = self.vision.calculate_angle_3d(hip, knee, ankle)
+        angle = self.vision.get_smoothed_angle(raw_angle)
 
-        # Logika Kalibracji
+        dist_ankle = abs(lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].x - lm[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x)
+        dist_hip = abs(lm[mp_pose.PoseLandmark.LEFT_HIP.value].x - lm[mp_pose.PoseLandmark.RIGHT_HIP.value].x)
+        is_sumo = dist_ankle > dist_hip * 1.5
+
+        color = (0, 255, 0)
+
         if not self.calibration_done:
-            cv2.putText(image, f"FAZA KALIBRACJI: {self.calibration_count + 1}/{self.calibration_reps}",
-                        (10, 100), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 165, 255), 2)
-            ar_color = (0, 165, 255)
-
-            if angle < self.current_min_angle:
-                self.current_min_angle = angle
-            if angle > 160:
-                self.stage = "gora"
-            if angle < 100 and self.stage == "gora" and is_sumo:
-                self.stage = "dol"
+            color = (0, 165, 255)
+            if angle < self.current_min_angle: self.current_min_angle = angle
+            if angle > 160: self.stage = "gora"
+            if angle < 100 and self.stage == "gora" and is_sumo: self.stage = "dol"
             if angle > 150 and self.stage == "dol":
                 self.stage = "gora"
                 self.calibration_angles.append(self.current_min_angle)
@@ -199,32 +253,26 @@ class PersonalTrainerApp:
                     self.target_depth = sum(self.calibration_angles) / len(self.calibration_angles) + 10
                     self.calibration_done = True
                     self.stage = None
-                    self.audio.speak(f"Kalibracja zakonczona. Docelowy kat to {int(self.target_depth)} stopni.")
-
-        # Logika Treningu Właściwego
+                    self.audio.speak(f"Kalibracja zakonczona.")
         else:
-            cv2.putText(image, f"CEL: {int(self.target_depth)} stopni",
-                        (10, 100), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 255, 0), 2)
+            self.target_label.config(text=f"{int(self.target_depth)}°")
             if not is_sumo:
-                ar_color = (0, 0, 255)
+                color = (0, 0, 255)
                 cv2.putText(image, "SZERZEJ STOPY!", (10, 140), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
-
-            if angle > 160:
-                self.stage = "gora"
+            if angle > 160: self.stage = "gora"
             if angle < self.target_depth and self.stage == "gora":
                 if is_sumo:
                     self.stage = "dol"
                     self.counter += 1
-                    ar_color = (0, 255, 0)
+                    color = (0, 255, 0)
                     self.audio.speak(str(self.counter))
                 else:
                     self.stage = "blad"
                     self.audio.speak("Szerzej stopy")
+            self.counter_label.config(text=str(self.counter))
 
-        self.vision.draw_protractor(image, left_hip, left_knee, left_ankle, angle, ar_color)
+        self.vision.draw_protractor(image, hip, knee, ankle, angle, color)
         self.vision.draw_landmarks(image, results.pose_landmarks)
-        cv2.putText(image, f"Powt: {self.counter}", (10, 50), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 0, 255), 2)
-        cv2.putText(image, f"Kat: {int(angle)}", (10, 190), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 255, 255), 2)
 
 
 if __name__ == "__main__":
