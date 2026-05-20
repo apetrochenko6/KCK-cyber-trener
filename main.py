@@ -33,6 +33,12 @@ class PersonalTrainerApp:
         self.calibration_done = False
         self.target_depth = 90.0
 
+        # Kalibracja przysiadu
+        self.calibration_reps = 3
+        self.calibration_count = 0
+        self.calibration_angles = []
+        self.current_min_angle = 180.0
+
         self.cap = None
         self.pose = None
 
@@ -173,7 +179,16 @@ class PersonalTrainerApp:
             messagebox.showerror("Błąd", "Nie znaleziono kamery.")
             return
 
-        self.is_running, self.counter, self.calibration_done = True, 0, False
+        self.is_running = True
+        self.counter = 0
+        self.stage = None
+        self.calibration_done = False
+
+        # Reset kalibracji
+        self.calibration_count = 0
+        self.calibration_angles = []
+        self.current_min_angle = 180.0
+
         self.counter_label.config(text="0")
         self.target_label.config(text="CALIB")
 

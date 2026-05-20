@@ -22,20 +22,17 @@ class VisionProcessor:
         self.alpha = 0.2  # Mniejsza wartość = większe wygładzenie, ale minimalne opóźnienie
 
     def calculate_angle_3d(self, a, b, c):
-        """Oblicza rzeczywisty kąt 3D korzystając z wektorów w przestrzeni (x, y, z)."""
-        a, b, c = np.array(a), np.array(b), np.array(c)
+        a = np.array(a)
+        b = np.array(b)
+        c = np.array(c)
 
-        # Wektory od stawu środkowego (kolana)
-        ba = a - b
-        bc = c - b
+        radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
+        angle = np.abs(radians * 180.0 / np.pi)
 
-        # Iloczyn skalarny i normy wektorów: cos(theta) = (u * v) / (|u| * |v|)
-        cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+        if angle > 180.0:
+            angle = 360 - angle
 
-        # Zabezpieczenie przed błędami precyzji (wartości minimalnie poza -1.0 i 1.0)
-        angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
-
-        return np.degrees(angle)
+        return angle
 
     def get_smoothed_angle(self, current_angle):
         """Filtr dolnoprzepustowy (EMA) wygładzający skoki odczytów kamery."""
