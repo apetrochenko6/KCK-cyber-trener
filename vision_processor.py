@@ -26,12 +26,11 @@ class VisionProcessor:
         b = np.array(b)
         c = np.array(c)
 
-        radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
-        angle = np.abs(radians * 180.0 / np.pi)
-
-        if angle > 180.0:
-            angle = 360 - angle
-
+        ba = a - b
+        bc = c - b
+        cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+        cosine_angle = np.clip(cosine_angle, -1.0, 1.0)
+        angle = np.arccos(cosine_angle) * (180.0 / np.pi)
         return angle
 
     def get_smoothed_angle(self, current_angle):
@@ -47,6 +46,7 @@ class VisionProcessor:
         key_points = [
             self.mp_pose.PoseLandmark.LEFT_HIP.value,
             self.mp_pose.PoseLandmark.LEFT_KNEE.value,
+            self.mp_pose.PoseLandmark.RIGHT_KNEE.value,
             self.mp_pose.PoseLandmark.LEFT_ANKLE.value,
             self.mp_pose.PoseLandmark.RIGHT_HIP.value,
             self.mp_pose.PoseLandmark.RIGHT_ANKLE.value

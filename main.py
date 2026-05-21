@@ -232,49 +232,109 @@ class PersonalTrainerApp:
 
     def _handle_pose_logic(self, image, lm, results):
         if not self.vision.check_visibility(lm):
-            cv2.putText(image, "SKORYGUJ POZYCJE (POZA KADREM)", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255),
-                        2)
+            cv2.putText(
+                image,
+                "SKORYGUJ POZYCJE (POZA KADREM)",
+                (50, 50),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (0, 0, 255),
+                2
+            )
             return
 
-        hip = [lm[mp_pose.PoseLandmark.LEFT_HIP.value].x, lm[mp_pose.PoseLandmark.LEFT_HIP.value].y,
-               lm[mp_pose.PoseLandmark.LEFT_HIP.value].z]
-        knee = [lm[mp_pose.PoseLandmark.LEFT_KNEE.value].x, lm[mp_pose.PoseLandmark.LEFT_KNEE.value].y,
-                lm[mp_pose.PoseLandmark.LEFT_KNEE.value].z]
-        ankle = [lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].x, lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].y,
-                 lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].z]
+        hip = [
+            lm[mp_pose.PoseLandmark.LEFT_HIP.value].x,
+            lm[mp_pose.PoseLandmark.LEFT_HIP.value].y,
+            lm[mp_pose.PoseLandmark.LEFT_HIP.value].z
+        ]
+
+        knee = [
+            lm[mp_pose.PoseLandmark.LEFT_KNEE.value].x,
+            lm[mp_pose.PoseLandmark.LEFT_KNEE.value].y,
+            lm[mp_pose.PoseLandmark.LEFT_KNEE.value].z
+        ]
+
+        ankle = [
+            lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].x,
+            lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].y,
+            lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].z
+        ]
 
         raw_angle = self.vision.calculate_angle_3d(hip, knee, ankle)
         angle = self.vision.get_smoothed_angle(raw_angle)
 
-        dist_ankle = abs(lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].x - lm[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x)
-        dist_hip = abs(lm[mp_pose.PoseLandmark.LEFT_HIP.value].x - lm[mp_pose.PoseLandmark.RIGHT_HIP.value].x)
-        is_sumo = dist_ankle > dist_hip * 1.5
+        dist_ankle = abs(
+            lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].x -
+            lm[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x
+        )
 
+        dist_hip = abs(
+            lm[mp_pose.PoseLandmark.LEFT_HIP.value].x -
+            lm[mp_pose.PoseLandmark.RIGHT_HIP.value].x
+        )
+
+        dist_knee = abs(
+            lm[mp_pose.PoseLandmark.LEFT_KNEE.value].x -
+            lm[mp_pose.PoseLandmark.RIGHT_KNEE.value].x
+        )
+
+        feet_wide = dist_ankle > dist_hip * 1.2
+        knees_out = dist_knee > (dist_ankle * 0.83)
+        print(f"Knees Out: {knees_out}, Feet Wide: {feet_wide}")
+        angle = self.vision.get_smoothed_angle(raw_angle)
+        print(f"Angle: {int(angle)} | Stage: {self.stage}")
+        print(f"Ankle width: {dist_ankle:.2f} | Knee width: {dist_knee:.2f}")
+        is_sumo = feet_wide and knees_out
         color = (0, 255, 0)
-
         if not self.calibration_done:
             color = (0, 165, 255)
-            if angle < self.current_min_angle: self.current_min_angle = angle
-            if angle > 160: self.stage = "gora"
-            if angle < 100 and self.stage == "gora" and is_sumo: self.stage = "dol"
-            if angle > 150 and self.stage == "dol":
-                self.stage = "gora"
-                self.calibration_angles.append(self.current_min_angle)
-                self.calibration_count += 1
-                self.current_min_angle = 180.0
-                self.audio.speak(str(self.calibration_count))
+            if angle < self.current_min_angle:
+                self.current_min_angle = angle
+            if self.stage == "dol" and angle > 115:
+                if is_sumo:
+                    self.stage = "gora"
+                    self.calibration_angles.append(self.current_min_angle)
+                    self.calibration_count += 1
+                    self.current_min_angle = 180.0
+                    self.audio.speak(str(self.calibration_count))
+                    if self.calibration_count >= self.calibration_reps:
+                        self.target_depth = (sum(self.calibration_angles) / len(self.calibration_angles)) + 15
+                        self.calibration_done = True
+                        self.stage = None
+                        self.audio.speak("Kalibracja zakonczona.")
+                else:
+                    self.stage = "blad"
+            elif angle > 115:
+                if is_sumo:
+                    self.stage = "gora"
+                else:
+                    self.stage = "blad"
 
-                if self.calibration_count >= self.calibration_reps:
-                    self.target_depth = sum(self.calibration_angles) / len(self.calibration_angles) + 10
-                    self.calibration_done = True
-                    self.stage = None
-                    self.audio.speak(f"Kalibracja zakonczona.")
+            if self.stage == "gora" and angle < 85 and is_sumo:
+                self.stage = "dol"
+
         else:
             self.target_label.config(text=f"{int(self.target_depth)}°")
+
             if not is_sumo:
                 color = (0, 0, 255)
-                cv2.putText(image, "SZERZEJ STOPY!", (10, 140), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
-            if angle > 160: self.stage = "gora"
+                cv2.putText(
+                    image,
+                    "ROZSUN KOLANA LUB STOPY!",
+                    (10, 140),
+                    cv2.FONT_HERSHEY_DUPLEX,
+                    1,
+                    (0, 0, 255),
+                    2
+                )
+
+            if angle > 115:
+                if is_sumo:
+                    self.stage = "gora"
+                else:
+                    self.stage = "blad"
+
             if angle < self.target_depth and self.stage == "gora":
                 if is_sumo:
                     self.stage = "dol"
@@ -283,7 +343,8 @@ class PersonalTrainerApp:
                     self.audio.speak(str(self.counter))
                 else:
                     self.stage = "blad"
-                    self.audio.speak("Szerzej stopy")
+                    self.audio.speak("Zla postawa")
+
             self.counter_label.config(text=str(self.counter))
 
         self.vision.draw_protractor(image, hip, knee, ankle, angle, color)
