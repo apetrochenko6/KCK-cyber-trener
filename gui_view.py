@@ -14,7 +14,6 @@ class TrainerGuiView:
             'tutorial': tutorial_cmd
         }
 
-        # Konfiguracja silnika CustomTkinter
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
 
@@ -28,7 +27,6 @@ class TrainerGuiView:
         self._create_layout()
 
     def _create_layout(self):
-        # Konfiguracja siatki (Grid) - Blokujemy lewą kolumnę na sztywne 340px
         self.window.grid_rowconfigure(0, weight=1)
         self.window.grid_columnconfigure(0, minsize=340, weight=0)
         self.window.grid_columnconfigure(1, weight=1)
@@ -40,7 +38,6 @@ class TrainerGuiView:
         ctk.CTkLabel(self.sidebar, text="SUMO AI", font=self.fonts["title"], text_color="#00E676").pack(pady=(40, 5))
         ctk.CTkLabel(self.sidebar, text="PERSONAL TRAINER v4.0", font=("Segoe UI", 10), text_color="gray").pack()
 
-        # BLOK OPISU APLIKACJI (Wypełnienie wolnej przestrzeni)
         opis_tekst = (
             "Inteligentny asystent treningowy\n"
             "działający całkowicie w trybie offline.\n\n"
@@ -51,31 +48,44 @@ class TrainerGuiView:
         )
         self.lbl_description = ctk.CTkLabel(self.sidebar, text=opis_tekst, font=self.fonts["stat_label"],
                                             text_color="gray", justify="center")
-        self.lbl_description.pack(pady=(30, 20))
+        self.lbl_description.pack(pady=(20, 10))
 
-        # Separator wizualny
         self.separator = ctk.CTkFrame(self.sidebar, height=2, fg_color=("gray80", "gray20"))
         self.separator.pack(fill="x", padx=40, pady=(0, 10))
 
-        # --- KONTROLKI KREATORA SESJI (WŁĄCZANE PODCZAS RUCHU) ---
+        # --- KONTROLKI KREATORA SESJI ---
         self.wizard_controls = ctk.CTkFrame(self.sidebar, fg_color="transparent")
 
-        ctk.CTkLabel(self.wizard_controls, text="USTAWIENIA SERII", font=self.fonts["header"]).pack(pady=(20, 10))
+        ctk.CTkLabel(self.wizard_controls, text="USTAWIENIA SERII", font=self.fonts["header"]).pack(pady=(10, 5))
+
+        # Wybór kamery
+        self.cam_mode_var = ctk.StringVar(value="1 Kamera (Front)")
+        self.cam_menu = ctk.CTkOptionMenu(self.wizard_controls, variable=self.cam_mode_var,
+                                          values=["1 Kamera (Front)", "2 Kamery (Front + Profil)"],
+                                          command=self._on_cam_mode_change, fg_color="#2196F3", button_color="#1976D2")
+        self.cam_menu.pack(pady=5, padx=40, fill="x")
+
+        self.cam_url_var = ctk.StringVar(value="http://192.168.1.15:8080/video")
+        self.cam_entry = ctk.CTkEntry(self.wizard_controls, textvariable=self.cam_url_var,
+                                      placeholder_text="Adres IP lub nr USB (np. 1)")
+        self.cam_entry.pack(pady=5, padx=40, fill="x")
+        self.cam_entry.configure(state="disabled")  # Domyślnie wyłączone
+
         ctk.CTkLabel(self.wizard_controls, text="CEL POWTÓRZEŃ:", font=self.fonts["stat_label"],
                      text_color="gray").pack(pady=(10, 0))
 
         self.target_reps_var = ctk.IntVar(value=10)
         self.slider = ctk.CTkSlider(self.wizard_controls, from_=1, to=20, variable=self.target_reps_var,
                                     number_of_steps=19, button_color="#00E676", progress_color="#00E676")
-        self.slider.pack(pady=10)
+        self.slider.pack(pady=5)
         self.slider_val_label = ctk.CTkLabel(self.wizard_controls, textvariable=self.target_reps_var,
                                              font=self.fonts["btn"])
         self.slider_val_label.pack()
 
         ctk.CTkButton(self.wizard_controls, text="ZALOGUJ SERIĘ", command=self.cmds['log'], font=self.fonts["btn"],
-                      fg_color="#2196F3", height=40).pack(pady=(30, 10), padx=40, fill="x")
+                      fg_color="#2196F3", height=35).pack(pady=(15, 10), padx=40, fill="x")
         ctk.CTkButton(self.wizard_controls, text="ZAKOŃCZ I ZAPISZ", command=self.cmds['stop'], font=self.fonts["btn"],
-                      fg_color="#FF5252", hover_color="#D32F2F", height=40).pack(pady=10, padx=40, fill="x")
+                      fg_color="#FF5252", hover_color="#D32F2F", height=35).pack(pady=5, padx=40, fill="x")
 
         # --- DOLNA SEKCJA PANELU ---
         self.bottom_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -85,7 +95,6 @@ class TrainerGuiView:
                                           progress_color="#00E676")
         self.theme_switch.pack(pady=(0, 20))
         self.theme_switch.select()
-
         ctk.CTkLabel(self.bottom_frame, text="Projekt Zespołowy - KCK", font=("Segoe UI", 10), text_color="gray").pack()
 
         # --- GŁÓWNY OBSZAR WYŚWIETLANIA ---
@@ -100,12 +109,16 @@ class TrainerGuiView:
         self._build_session()
         self._build_summary()
 
+    def _on_cam_mode_change(self, choice):
+        if choice == "2 Kamery (Front + Profil)":
+            self.cam_entry.configure(state="normal")
+        else:
+            self.cam_entry.configure(state="disabled")
+
     def _build_dashboard(self):
         ctk.CTkButton(self.screen_dashboard, text="NOWA SESJA TRENINGOWA", font=self.fonts["title"],
                       command=self.cmds['start'], height=60, fg_color="#00E676", hover_color="#00C853",
                       text_color="black").pack(pady=(40, 10))
-
-        # PRZYCISK TUTORIAL (Wywołuje pustą funkcję)
         ctk.CTkButton(self.screen_dashboard, text="TUTORIAL", font=self.fonts["btn"], command=self.cmds['tutorial'],
                       height=40, fg_color="#2196F3", hover_color="#1976D2", text_color="white").pack(pady=(0, 40))
 
@@ -114,10 +127,8 @@ class TrainerGuiView:
 
         self.stat_total = self._create_stat_card(stats_frame, "CAŁKOWITE POWT.", "0", "#00E676")
         self.stat_total.pack(side="left", expand=True, padx=10)
-
         self.stat_avg = self._create_stat_card(stats_frame, "ŚREDNIA NA SERIĘ", "0", "#2196F3")
         self.stat_avg.pack(side="left", expand=True, padx=10)
-
         self.stat_last = self._create_stat_card(stats_frame, "OSTATNIA SESJA", "Brak", "gray")
         self.stat_last.pack(side="left", expand=True, padx=10)
 
@@ -154,7 +165,6 @@ class TrainerGuiView:
 
         self.sum_total = self._create_stat_card(stats_frame, "ZROBIONE POWTÓRZENIA", "0", "#00E676")
         self.sum_total.pack(side="left", expand=True, padx=10)
-
         self.sum_sets = self._create_stat_card(stats_frame, "ZROBIONE SERIE", "0", "#2196F3")
         self.sum_sets.pack(side="left", expand=True, padx=10)
 
@@ -247,3 +257,13 @@ class TrainerGuiView:
 
     def get_target_reps(self):
         return self.target_reps_var.get()
+
+    def get_cam_mode(self):
+        return self.cam_mode_var.get()
+
+    def get_cam_url(self):
+        val = self.cam_url_var.get()
+        # Jeśli wpisano samo "1", zamień na int, inaczej zostaw jako URL
+        if val.isdigit():
+            return int(val)
+        return val
