@@ -119,7 +119,7 @@ class PersonalTrainerApp:
         self.view.update_counter("0")
         self.view.update_target("CALIB")
 
-        self.pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+        self.pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5, model_complexity=0)
         self.view.show_session_running()
         self.view.update_status("Kamera aktywna. Wykonuj przysiady!")
         self.audio.speak("Rozpoczynamy nową sesję. Zaczynam analizę.")
@@ -166,121 +166,90 @@ class PersonalTrainerApp:
 
     def _handle_pose_logic(self, image, lm, results):
         if not self.vision.check_visibility(lm):
-            cv2.putText(
-                image,
-                "SKORYGUJ POZYCJE (POZA KADREM)",
-                (50, 50),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (0, 0, 255),
-                2
-            )
+            cv2.putText(image, "POZA KADREM", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+            self.stage = 'blad'
             return
 
-        hip = [
-            lm[mp_pose.PoseLandmark.LEFT_HIP.value].x,
-            lm[mp_pose.PoseLandmark.LEFT_HIP.value].y,
-            lm[mp_pose.PoseLandmark.LEFT_HIP.value].z
-        ]
-
-        knee = [
-            lm[mp_pose.PoseLandmark.LEFT_KNEE.value].x,
-            lm[mp_pose.PoseLandmark.LEFT_KNEE.value].y,
-            lm[mp_pose.PoseLandmark.LEFT_KNEE.value].z
-        ]
-
-        ankle = [
-            lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].x,
-            lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].y,
-            lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].z
-        ]
+        # =========================
+        # 1. LANDMARKS
+        # =========================
+        l_hip = lm[mp_pose.PoseLandmark.LEFT_HIP.value]
+        r_hip = lm[mp_pose.PoseLandmark.RIGHT_HIP.value]
+        l_knee = lm[mp_pose.PoseLandmark.LEFT_KNEE.value]
+        r_knee = lm[mp_pose.PoseLandmark.RIGHT_KNEE.value]
+        l_ankle = lm[mp_pose.PoseLandmark.LEFT_ANKLE.value]
+        r_ankle = lm[mp_pose.PoseLandmark.RIGHT_ANKLE.value]
+        l_shoulder = lm[mp_pose.PoseLandmark.LEFT_SHOULDER.value]
+        r_shoulder = lm[mp_pose.PoseLandmark.RIGHT_SHOULDER.value]
+        dist_shoulder = self.vision.get_3d_dist(l_shoulder, r_shoulder)
+        hip = [l_hip.x, l_hip.y, l_hip.z]
+        knee = [l_knee.x, l_knee.y, l_knee.z]
+        ankle = [l_ankle.x, l_ankle.y, l_ankle.z]
 
         raw_angle = self.vision.calculate_angle_3d(hip, knee, ankle)
         angle = self.vision.get_smoothed_angle(raw_angle)
 
-        dist_ankle = abs(
-            lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].x -
-            lm[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x
-        )
+        if not hasattr(self, "prev_angle"):
+            self.prev_angle = angle
+        velocity = angle - self.prev_angle
+        self.prev_angle = angle
 
-        dist_hip = abs(
-            lm[mp_pose.PoseLandmark.LEFT_HIP.value].x -
-            lm[mp_pose.PoseLandmark.RIGHT_HIP.value].x
-        )
+        dist_ankle = self.vision.get_3d_dist(l_ankle, r_ankle)
+        dist_knee = self.vision.get_3d_dist(l_knee, r_knee)
+        dist_hip = self.vision.get_3d_dist(l_hip, r_hip)
 
-        dist_knee = abs(
-            lm[mp_pose.PoseLandmark.LEFT_KNEE.value].x -
-            lm[mp_pose.PoseLandmark.RIGHT_KNEE.value].x
-        )
+        knee_ratio = dist_knee / (dist_shoulder * 1.2 + 0.0001)
 
-        feet_wide = dist_ankle > dist_hip * 1.2
-        knees_out = dist_knee > (dist_ankle * 0.83)
-        print(f"Knees Out: {knees_out}, Feet Wide: {feet_wide}")
-        angle = self.vision.get_smoothed_angle(raw_angle)
-        print(f"Angle: {int(angle)} | Stage: {self.stage}")
-        print(f"Ankle width: {dist_ankle:.2f} | Knee width: {dist_knee:.2f}")
-        is_sumo = feet_wide and knees_out
-        color = (0, 255, 0)
-        if not self.calibration_done:
-            color = (0, 165, 255)
-            if angle < self.current_min_angle:
-                self.current_min_angle = angle
-            if self.stage == "dol" and angle > 115:
-                if is_sumo:
-                    self.stage = "gora"
-                    self.calibration_angles.append(self.current_min_angle)
-                    self.calibration_count += 1
-                    self.current_min_angle = 180.0
-                    self.audio.speak(str(self.calibration_count))
-                    if self.calibration_count >= self.calibration_reps:
-                        self.target_depth = (sum(self.calibration_angles) / len(self.calibration_angles)) + 15
-                        self.calibration_done = True
-                        self.stage = None
-                        self.audio.speak("Kalibracja zakonczona.")
-                else:
-                    self.stage = "blad"
-            elif angle > 115:
-                if is_sumo:
-                    self.stage = "gora"
-                else:
-                    self.stage = "blad"
+        feet_ratio = dist_ankle / (dist_shoulder * 1.5 + 0.0001)
 
-            if self.stage == "gora" and angle < 85 and is_sumo:
+        knees_ok = knee_ratio > 1.0
+        feet_wide = feet_ratio > 1.0
+        is_sumo = feet_wide and knees_ok
+
+        if not is_sumo:
+            cv2.putText(image, "BLAD POSTAWY!", (10, 140), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
+
+        target_depth = 95
+
+        if self.stage == "gora" and angle < target_depth:
+            if is_sumo:
                 self.stage = "dol"
-
-        else:
-            self.view.update_target(f"{int(self.target_depth)}°")
-
-            if not is_sumo:
-                color = (0, 0, 255)
-                cv2.putText(
-                    image,
-                    "ROZSUN KOLANA LUB STOPY!",
-                    (10, 140),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    1,
-                    (0, 0, 255),
-                    2
-                )
-
-            if angle > 115:
-                if is_sumo:
+            else:
+                self.stage = "blad"
+                self.audio.speak("Zla postawa")
+        if angle > 110:
+            if is_sumo:
+                if self.stage == "dol":
                     self.stage = "gora"
-                else:
-                    self.stage = "blad"
-
-            if angle < self.target_depth and self.stage == "gora":
-                if is_sumo:
-                    self.stage = "dol"
                     self.counter += 1
-                    color = (0, 255, 0)
+                    self.current_reps += 1
                     self.audio.speak(str(self.counter))
-                else:
-                    self.stage = "blad"
-                    self.audio.speak("Zla postawa")
+                if self.stage == "blad":
+                    self.stage = "gora"
+            else:
+                self.stage = "blad"
+                cv2.putText(image, "POPRAW POSTAWE!", (10, 140), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
 
-            self.view.update_counter(str(self.counter))
 
+        # =========================
+        # LOGS
+        # =========================
+        print("-" * 40)
+        print(f"Angle: {int(angle)}° | Velocity: {velocity:.2f} | Stage: {self.stage}")
+        print("--- Widths (3D) ---")
+        print(f"Ankle: {dist_ankle:.3f} | Knee: {dist_knee:.3f} | Hip: {dist_hip:.3f}")
+        print("--- Ratios ---")
+        print(f"Feet/Hip Ratio: {feet_ratio:.3f} (Треба > 1.5) -> {feet_wide}")
+        print(f"Knee/Hip Ratio: {knee_ratio:.3f} (Треба > 1.2) -> {knees_ok}")
+        print("--- Final ---")
+        print(f"IS SUMO: {is_sumo}")
+
+        # =========================
+        # 6. VISUAL
+        # =========================
+        color = (0, 255, 0) if is_sumo else (0, 0, 255)
+
+        self.view.update_counter(str(self.counter))
         self.vision.draw_protractor(image, hip, knee, ankle, angle, color)
         self.vision.draw_landmarks(image, results.pose_landmarks)
 
