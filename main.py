@@ -3,7 +3,8 @@ from tkinter import messagebox
 import cv2
 from PIL import Image, ImageTk
 import sys
-
+import webbrowser
+import customtkinter as ctk
 # Importowanie modułów logicznych
 from training_data import TrainingData
 from vision_processor import VisionProcessor, mp_pose
@@ -81,15 +82,11 @@ class PersonalTrainerApp:
         self.audio.speak("Seria zalogowana.")
 
     def save_session(self):
-        success = self.data_manager.save_complete_session(self.active_session)
-        if success:
-            msg = self.data_manager.get_structured_session_string(self.active_session['total_reps'],
-                                                                  len(self.active_session['sets_list']))
-            self.audio.speak(msg)
-            messagebox.showinfo("Sesja zapisana",
-                                f"Zapisano pomyślnie!\nWszystkie powtórzenia: {self.active_session['total_reps']}")
-        else:
-            messagebox.showerror("Błąd", "Nie udało się zapisać pliku CSV.")
+        total_reps = self.active_session['total_reps']
+        self.data_manager.save_to_csv(total_reps)
+        msg = self.data_manager.get_progression_message(total_reps)
+        self.audio.speak(msg)
+        messagebox.showinfo("Sesja zapisana", f"Zapisano pomyślnie!\n{msg}")
         self.state = STATE_DASHBOARD
         self.active_session = None
         self.view.show_dashboard(self.data_manager.get_dashboard_summary())
@@ -124,8 +121,46 @@ class PersonalTrainerApp:
         self.view.update_status("Kamera aktywna. Wykonuj przysiady!")
         self.audio.speak("Rozpoczynamy nową sesję. Zaczynam analizę.")
         self.process_video()
+
     def show_tutorial(self):
-        pass
+        tut_win = ctk.CTkToplevel(self.window)
+        tut_win.title("Instrukcja - Sumo Squat")
+        tut_win.geometry("650x750")
+        tut_win.attributes("-topmost", True)
+
+        ctk.CTkLabel(tut_win, text="Jak poprawnie wykonać Sumo Squat",
+                     font=("Segoe UI", 20, "bold")).pack(pady=20)
+
+        instr_frame = ctk.CTkFrame(tut_win, fg_color="transparent")
+        instr_frame.pack(pady=10, padx=20, fill="x")
+
+        text = "1. Stań szeroko (stopy szerzej niż barki, palce na zewnątrz).\n" \
+               "2. Trzymaj plecy proste, klatka piersiowa wypchnięta.\n" \
+               "3. Wykonaj przysiad - kolana muszą podążać za kierunkiem palców."
+
+        ctk.CTkLabel(instr_frame, text=text, font=("Segoe UI", 15), justify="left").pack(anchor="w")
+
+
+        img_frame = ctk.CTkFrame(tut_win, fg_color="transparent")
+        img_frame.pack(pady=20)
+        img_start = ctk.CTkImage(light_image=Image.open("assets/tutorial_start_pos.png"),
+                                 dark_image=Image.open("assets/tutorial_start_pos.png"), size=(250, 250))
+        img_squat = ctk.CTkImage(light_image=Image.open("assets/tutorial_end_pos.png"),
+                                 dark_image=Image.open("assets/tutorial_end_pos.png"), size=(250, 250))
+        for img, label in [(img_start, "Pozycja startowa"), (img_squat, "Pozycja dolna")]:
+            card = ctk.CTkFrame(img_frame, corner_radius=10)
+            card.pack(side="left", padx=15)
+            ctk.CTkLabel(card, image=img, text="").pack(pady=5, padx=5)
+            ctk.CTkLabel(card, text=label, font=("Segoe UI", 12, "bold")).pack(pady=5)
+
+        def open_video():
+            webbrowser.open("https://www.youtube.com/watch?v=YOUR_VIDEO_ID")
+
+        ctk.CTkButton(tut_win, text="▶ Obejrzyj wideo tutorial", command=open_video,
+                      fg_color="#E64A19", hover_color="#BF360C", height=40).pack(pady=25, padx=50, fill="x")
+
+        ctk.CTkButton(tut_win, text="Zamknij", command=tut_win.destroy,
+                      fg_color="transparent", border_width=2, border_color="gray").pack(pady=5)
     def discard_session(self):
         if self.state != STATE_SESSION_SUMMARY: return
         self.state = STATE_DASHBOARD
