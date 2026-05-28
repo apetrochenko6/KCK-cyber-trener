@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-
+import math
 # --- POPRAWKA IMPORTU MEDIAPIPE ---
 try:
     from mediapipe.python.solutions import pose as mp_pose
@@ -18,25 +18,28 @@ class VisionProcessor:
         self.mp_drawing = mp_drawing
 
         # Inicjalizacja filtru EMA do wygładzania kąta (usuwa drgania)
+        self.ema_memory = {}
         self.smoothed_angle = None
-        self.alpha = 0.2  # Mniejsza wartość = większe wygładzenie, ale minimalne opóźnienie
+        self.alpha = 0.064  # Mniejsza wartość = większe wygładzenie, ale minimalne opóźnienie
 
     def calculate_angle_3d(self, a, b, c):
-        """Oblicza rzeczywisty kąt 3D korzystając z wektorów w przestrzeni (x, y, z)."""
-        a, b, c = np.array(a), np.array(b), np.array(c)
+        a = np.array(a)
+        b = np.array(b)
+        c = np.array(c)
 
-        # Wektory od stawu środkowego (kolana)
         ba = a - b
         bc = c - b
-
-        # Iloczyn skalarny i normy wektorów: cos(theta) = (u * v) / (|u| * |v|)
         cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+        cosine_angle = np.clip(cosine_angle, -1.0, 1.0)
+        angle = np.arccos(cosine_angle) * (180.0 / np.pi)
+        return angle
+    def get_3d_dist(self, lm1, lm2):
 
-        # Zabezpieczenie przed błędami precyzji (wartości minimalnie poza -1.0 i 1.0)
-        angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
-
-        return np.degrees(angle)
-
+        return math.sqrt(
+            (lm1.x - lm2.x) ** 2 +
+            (lm1.y - lm2.y) ** 2 +
+            (lm1.z - lm2.z) ** 2
+        )
     def get_smoothed_angle(self, current_angle):
         """Filtr dolnoprzepustowy (EMA) wygładzający skoki odczytów kamery."""
         if self.smoothed_angle is None:
@@ -45,11 +48,22 @@ class VisionProcessor:
             self.smoothed_angle = (self.alpha * current_angle) + ((1 - self.alpha) * self.smoothed_angle)
         return self.smoothed_angle
 
+    def get_smoothed_value(self, key, current_value, custom_alpha=None):
+        alpha = custom_alpha if custom_alpha is not None else self.alpha
+
+        if key not in self.ema_memory:
+            self.ema_memory[key] = current_value
+        else:
+            # St = (alpha * Xt) + ((1 - alpha) * St-1)
+            self.ema_memory[key] = (alpha * current_value) + ((1 - alpha) * self.ema_memory[key])
+
+        return self.ema_memory[key]
     def check_visibility(self, landmarks, threshold=0.5):
         """Sprawdza, czy kluczowe stopy i biodra są fizycznie w kadrze kamery."""
         key_points = [
             self.mp_pose.PoseLandmark.LEFT_HIP.value,
             self.mp_pose.PoseLandmark.LEFT_KNEE.value,
+            self.mp_pose.PoseLandmark.RIGHT_KNEE.value,
             self.mp_pose.PoseLandmark.LEFT_ANKLE.value,
             self.mp_pose.PoseLandmark.RIGHT_HIP.value,
             self.mp_pose.PoseLandmark.RIGHT_ANKLE.value

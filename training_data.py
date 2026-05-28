@@ -59,3 +59,11 @@ class TrainingData:
         plt.ylabel("Liczba powtórzeń")
         plt.grid(True)
         plt.show()
+
+    def get_dashboard_summary(self):
+        return {
+            'total_reps': 0,  # Całkowita liczba powtórzeń (int)
+            'avg_reps_per_set': 0,  # Średnia na serię (int/float)
+            'last_session': "Brak",  # Data ostatniej sesji (string)
+            'sessions_list': []  # Lista ostatnich sesji
+        }

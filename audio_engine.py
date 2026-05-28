@@ -25,10 +25,26 @@ class AudioEngine:
         self.last_spoken_time = 0
 
         # Uruchomienie pętli TTS i wątku STT
-        self.window.after(100, self.process_tts_queue)
+        self.tts_thread = threading.Thread(target=self._tts_worker, daemon=True)
+        self.tts_thread.start()
         self.voice_thread = threading.Thread(target=self.voice_listener, daemon=True)
         self.voice_thread.start()
 
+    def _tts_worker(self):
+        engine = pyttsx3.init()
+        while True:
+            text = self.tts_queue.get()
+            if text is None:
+                break
+
+            try:
+                print("MÓWIĘ:", text)
+                engine.say(text)
+                engine.runAndWait()
+            except Exception as e:
+                print("Błąd TTS:", e)
+            finally:
+                self.tts_queue.task_done()
     def process_tts_queue(self):
         if not self.tts_queue.empty():
             text = self.tts_queue.get()
