@@ -5,6 +5,8 @@ from PIL import Image, ImageTk
 import sys
 import webbrowser
 import customtkinter as ctk
+from pywin.framework.editor import color
+
 # Importowanie modułów logicznych
 from training_data import TrainingData
 from vision_processor import VisionProcessor, mp_pose
@@ -200,6 +202,52 @@ class PersonalTrainerApp:
         if self.state == STATE_SESSION_RUNNING:
             self.window.after(10, self.process_video)
 
+    def _run_calibration(self, angle, is_sumo):
+        self.view.update_target(f"KAL {self.calibration_count}/{self.calibration_reps}")
+        print("\n" + "=" * 50)
+        print("DEBUG KALIBRACJI")
+        print(f"angle = {angle:.2f}")
+        print(f"is_sumo = {is_sumo}")
+        print(f"stage = {self.stage}")
+        print(f"current_min_angle = {self.current_min_angle:.2f}")
+        print(f"calibration_count = {self.calibration_count}")
+        print(f"calibration_angles = {self.calibration_angles}")
+        DOWN_LIMIT = 95
+        UP_LIMIT = 110
+        if not is_sumo and self.stage not in ("dol", "gora"):
+            self.stage = "blad"
+            self.view.update_status("Popraw postawę do kalibracji!")
+            return
+        if angle < DOWN_LIMIT and self.stage == "gora":
+            if is_sumo:
+                self.stage = "dol"
+            else:
+                self.stage = "blad"
+            if angle < self.current_min_angle:
+                self.current_min_angle = angle
+            self.view.update_status("Dobrze, teraz wstań.")
+        elif angle > UP_LIMIT and self.stage == "dol":
+            if is_sumo:
+                if self.current_min_angle < DOWN_LIMIT:
+                    self.calibration_angles.append(self.current_min_angle)
+                    self.calibration_count += 1
+                    self.audio.speak(f"Kalibracja {self.calibration_count}")
+            self.current_min_angle = 180.0
+            self.stage = "gora"
+            if self.calibration_count >= self.calibration_reps:
+                avg_depth = sum(self.calibration_angles) / len(self.calibration_angles)
+                self.target_depth = avg_depth + 10.0
+
+                self.calibration_done = True
+                self.view.update_target(str(int(self.target_depth)))
+                self.view.update_status("Kalibracja zakończona! Zaczynamy trening.")
+                self.audio.speak("Kalibracja zakończona")
+            else:
+                self.view.update_status(f"Zrób jeszcze {self.calibration_reps - self.calibration_count} przysiady.")
+
+        elif angle > UP_LIMIT:
+            self.stage = "gora"
+            self.view.update_status("Zrób głęboki przysiad, aby wykalibrować program.")
     def _handle_pose_logic(self, image, lm, results):
         if not self.vision.check_visibility(lm):
             cv2.putText(image, "POZA KADREM", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
@@ -244,10 +292,15 @@ class PersonalTrainerApp:
 
         if not is_sumo:
             cv2.putText(image, "BLAD POSTAWY!", (10, 140), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
+        if not self.calibration_done:
+            self._run_calibration(angle, is_sumo)
+            color=(0,255,0) if is_sumo else (0,0,255)
+            self.vision.draw_protractor(image,hip, knee, ankle,angle,color)
+            self.vision.draw_landmarks(image, results.pose_landmarks)
+            return
 
-        target_depth = 95
 
-        if self.stage == "gora" and angle < target_depth:
+        if self.stage == "gora" and angle < self.target_depth:
             if is_sumo:
                 self.stage = "dol"
             else:
