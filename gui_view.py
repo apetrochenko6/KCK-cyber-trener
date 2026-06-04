@@ -78,7 +78,7 @@ class TrainerGuiView:
 
         ctk.CTkButton(self.wizard_controls, text="ZALOGUJ SERIĘ", command=self.cmds['log'], font=self.fonts["btn"],
                       fg_color="#2196F3", height=40).pack(pady=(30, 10), padx=40, fill="x")
-        ctk.CTkButton(self.wizard_controls, text="ZAKOŃCZ I ZAPISZ", command=self.cmds['stop'], font=self.fonts["btn"],
+        ctk.CTkButton(self.wizard_controls, text="ZAKOŃCZ TRENING", command=self.cmds['stop'], font=self.fonts["btn"],
                       fg_color="#FF5252", hover_color="#D32F2F", height=40).pack(pady=10, padx=40, fill="x")
 
         # --- DOLNA SEKCJA PANELU ---
