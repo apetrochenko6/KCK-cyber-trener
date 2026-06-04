@@ -42,17 +42,16 @@ class TrainerGuiView:
         self.sidebar = ctk.CTkFrame(self.window, corner_radius=0, fg_color=("#f4f4f4", "#242424"))
         self.sidebar.grid(row=0, column=0, sticky="nsew")
 
-        ctk.CTkLabel(self.sidebar, text="SUMO AI", font=self.fonts["title"], text_color="#00E676").pack(pady=(40, 5))
-        ctk.CTkLabel(self.sidebar, text="PERSONAL TRAINER v4.0", font=("Segoe UI", 10), text_color="gray").pack()
+        ctk.CTkLabel(self.sidebar, text="CYBERTRAINER", font=self.fonts["title"], text_color="#00E676").pack(pady=(40, 5))
+        ctk.CTkLabel(self.sidebar, text="SUMO SQUAT ANALYZER", font=("Segoe UI", 10), text_color="gray").pack()
 
         # BLOK OPISU APLIKACJI (Wypełnienie wolnej przestrzeni)
         opis_tekst = (
             "Inteligentny asystent treningowy\n"
             "działający całkowicie w trybie offline.\n\n"
-            "Wykorzystuje zaawansowaną wizję\n"
-            "komputerową do analizy postawy i\n"
-            "biomechaniki przysiadów sumo\n"
-            "w czasie rzeczywistym."
+            "Analizuje postawę, liczy powtórzenia\n"
+            "i pomaga poprawiać technikę\n"
+            "przysiadu sumo w czasie rzeczywistym."
         )
         self.lbl_description = ctk.CTkLabel(self.sidebar, text=opis_tekst, font=self.fonts["stat_label"],
                                             text_color="gray", justify="center")
