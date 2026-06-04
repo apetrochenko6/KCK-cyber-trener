@@ -40,6 +40,7 @@ class PersonalTrainerApp:
             start_cmd=self.start_training,
             stop_cmd=self.stop_training,
             log_cmd=self.log_set,
+            save_cmd=self.save_session,
             discard_cmd=self.discard_session,
             tutorial_cmd=self.show_tutorial
         )
