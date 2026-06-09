@@ -66,7 +66,12 @@ class VisionProcessor:
             self.mp_pose.PoseLandmark.RIGHT_KNEE.value,
             self.mp_pose.PoseLandmark.LEFT_ANKLE.value,
             self.mp_pose.PoseLandmark.RIGHT_HIP.value,
-            self.mp_pose.PoseLandmark.RIGHT_ANKLE.value
+            self.mp_pose.PoseLandmark.RIGHT_ANKLE.value,
+            self.mp_pose.PoseLandmark.RIGHT_ANKLE.value,  # Poprawione: dodany przecinek
+            self.mp_pose.PoseLandmark.LEFT_HEEL.value,  # Poprawione: .value oraz przecinek
+            self.mp_pose.PoseLandmark.LEFT_FOOT_INDEX.value,  # Poprawione: pełna ścieżka do enuma
+            self.mp_pose.PoseLandmark.RIGHT_HEEL.value,  # Poprawione: pełna ścieżka do enuma
+            self.mp_pose.PoseLandmark.RIGHT_FOOT_INDEX.value  # Poprawione: pełna ścieżka do enuma
         ]
 
         for point in key_points:

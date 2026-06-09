@@ -204,14 +204,6 @@ class PersonalTrainerApp:
 
     def _run_calibration(self, angle, is_sumo):
         self.view.update_target(f"KAL {self.calibration_count}/{self.calibration_reps}")
-        print("\n" + "=" * 50)
-        print("DEBUG KALIBRACJI")
-        print(f"angle = {angle:.2f}")
-        print(f"is_sumo = {is_sumo}")
-        print(f"stage = {self.stage}")
-        print(f"current_min_angle = {self.current_min_angle:.2f}")
-        print(f"calibration_count = {self.calibration_count}")
-        print(f"calibration_angles = {self.calibration_angles}")
         DOWN_LIMIT = 95
         UP_LIMIT = 110
         if not is_sumo and self.stage not in ("dol", "gora"):
