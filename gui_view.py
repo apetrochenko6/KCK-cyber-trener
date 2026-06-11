@@ -4,11 +4,12 @@ from PIL import Image, ImageTk
 
 
 class TrainerGuiView:
-    def __init__(self, window, start_cmd, stop_cmd, log_cmd, discard_cmd, tutorial_cmd):
+    def __init__(self, window, start_cmd, stop_cmd, log_cmd, save_cmd, discard_cmd, tutorial_cmd):
         self.window = window
         self.cmds = {
             'start': start_cmd,
             'stop': stop_cmd,
+            'save': save_cmd,
             'log': log_cmd,
             'discard': discard_cmd,
             'tutorial': tutorial_cmd
@@ -17,6 +18,10 @@ class TrainerGuiView:
         # Konfiguracja silnika CustomTkinter
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
+
+        self.dark_bg = "#242424"
+        self.light_bg = "#ebebeb"
+        self._set_root_background(self.dark_bg)
 
         self.fonts = {
             "title": ("Segoe UI", 28, "bold"),
@@ -34,20 +39,19 @@ class TrainerGuiView:
         self.window.grid_columnconfigure(1, weight=1)
 
         # --- PANEL BOCZNY (Sidebar) ---
-        self.sidebar = ctk.CTkFrame(self.window, corner_radius=0)
+        self.sidebar = ctk.CTkFrame(self.window, corner_radius=0, fg_color=("#f4f4f4", "#242424"))
         self.sidebar.grid(row=0, column=0, sticky="nsew")
 
-        ctk.CTkLabel(self.sidebar, text="SUMO AI", font=self.fonts["title"], text_color="#00E676").pack(pady=(40, 5))
-        ctk.CTkLabel(self.sidebar, text="PERSONAL TRAINER v4.0", font=("Segoe UI", 10), text_color="gray").pack()
+        ctk.CTkLabel(self.sidebar, text="CYBERTRAINER", font=self.fonts["title"], text_color="#00E676").pack(pady=(40, 5))
+        ctk.CTkLabel(self.sidebar, text="SUMO SQUAT ANALYZER", font=("Segoe UI", 10), text_color="gray").pack()
 
         # BLOK OPISU APLIKACJI (Wypełnienie wolnej przestrzeni)
         opis_tekst = (
             "Inteligentny asystent treningowy\n"
             "działający całkowicie w trybie offline.\n\n"
-            "Wykorzystuje zaawansowaną wizję\n"
-            "komputerową do analizy postawy i\n"
-            "biomechaniki przysiadów sumo\n"
-            "w czasie rzeczywistym."
+            "Analizuje postawę, liczy powtórzenia\n"
+            "i pomaga poprawiać technikę\n"
+            "przysiadu sumo w czasie rzeczywistym."
         )
         self.lbl_description = ctk.CTkLabel(self.sidebar, text=opis_tekst, font=self.fonts["stat_label"],
                                             text_color="gray", justify="center")
@@ -74,7 +78,7 @@ class TrainerGuiView:
 
         ctk.CTkButton(self.wizard_controls, text="ZALOGUJ SERIĘ", command=self.cmds['log'], font=self.fonts["btn"],
                       fg_color="#2196F3", height=40).pack(pady=(30, 10), padx=40, fill="x")
-        ctk.CTkButton(self.wizard_controls, text="ZAKOŃCZ I ZAPISZ", command=self.cmds['stop'], font=self.fonts["btn"],
+        ctk.CTkButton(self.wizard_controls, text="ZAKOŃCZ TRENING", command=self.cmds['stop'], font=self.fonts["btn"],
                       fg_color="#FF5252", hover_color="#D32F2F", height=40).pack(pady=10, padx=40, fill="x")
 
         # --- DOLNA SEKCJA PANELU ---
@@ -89,7 +93,7 @@ class TrainerGuiView:
         ctk.CTkLabel(self.bottom_frame, text="Projekt Zespołowy - KCK", font=("Segoe UI", 10), text_color="gray").pack()
 
         # --- GŁÓWNY OBSZAR WYŚWIETLANIA ---
-        self.main_content = ctk.CTkFrame(self.window, corner_radius=20)
+        self.main_content = ctk.CTkFrame(self.window, corner_radius=20, fg_color=("#f4f4f4", "#242424"))
         self.main_content.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
         self.screen_dashboard = ctk.CTkFrame(self.main_content, fg_color="transparent")
@@ -177,7 +181,7 @@ class TrainerGuiView:
         btn_frame = ctk.CTkFrame(self.screen_summary, fg_color="transparent")
         btn_frame.pack(fill="x", padx=40, pady=20)
 
-        ctk.CTkButton(btn_frame, text="ZAPISZ DO HISTORII", command=self.cmds['stop'], font=self.fonts["btn"],
+        ctk.CTkButton(btn_frame, text="ZAPISZ DO HISTORII", command=self.cmds['save'], font=self.fonts["btn"],
                       fg_color="#00E676", hover_color="#00C853", text_color="black", height=50).pack(side="left",
                                                                                                      expand=True,
                                                                                                      padx=10)
@@ -187,9 +191,11 @@ class TrainerGuiView:
     def toggle_theme(self):
         if self.theme_switch.get() == 1:
             ctk.set_appearance_mode("dark")
+            self._set_root_background(self.dark_bg)
             self.theme_switch.configure(text="Tryb Ciemny")
         else:
             ctk.set_appearance_mode("light")
+            self._set_root_background(self.light_bg)
             self.theme_switch.configure(text="Tryb Jasny")
 
 
@@ -269,3 +275,9 @@ class TrainerGuiView:
     def update_target(self, text):
         if hasattr(self, 'target_label'):
             self.target_label.configure(text=str(text))
+
+    def _set_root_background(self, color):
+        try:
+            self.window.configure(fg_color=color)
+        except tk.TclError:
+            self.window.configure(bg=color)
