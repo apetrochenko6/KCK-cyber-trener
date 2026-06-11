@@ -3,7 +3,7 @@ opencv-python
 numpy
 matplotlib
 Pillow
-pyttsx3
+pyttsx3==2.90
 sounddevice
 vosk
 customtkinter
