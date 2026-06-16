@@ -419,17 +419,6 @@ class PersonalTrainerApp:
             self._draw_feedback(image, feedback_text)
             self.view.update_status(feedback_voice or feedback_text)
             self._speak_feedback(feedback_text, feedback_voice)
-
-        print("-" * 40)
-        print(f"Angle: {int(angle)}° | Velocity: {velocity:.2f} | Stage: {self.stage}")
-        print("--- Widths (3D) ---")
-        print(f"Ankle: {dist_ankle:.3f} | Knee: {dist_knee:.3f} | Hip: {dist_hip:.3f}")
-        print("--- Ratios ---")
-        print(f"Feet/Hip Ratio: {feet_ratio:.3f} (trzeba > 1.0) -> {feet_wide}")
-        print(f"Knee/Hip Ratio: {knee_ratio:.3f} (trzeba > 1.0) -> {knees_ok}")
-        print("--- Final ---")
-        print(f"IS SUMO: {is_sumo}")
-
         color = (0, 255, 0) if is_sumo else (0, 0, 255)
         self.view.update_counter(str(self.counter))
         self.vision.draw_protractor(image, hip, knee, ankle, angle, color)
