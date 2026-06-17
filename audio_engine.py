@@ -10,8 +10,6 @@ import winsound
 
 
 class AudioEngine:
-    """Klasa odpowiedzialna za komunikację głosową (TTS) oraz rozpoznawanie mowy (STT)."""
-
     def __init__(self, tk_window, on_start_cmd, on_stop_cmd):
         self.window = tk_window
         self.on_start = on_start_cmd
@@ -24,7 +22,6 @@ class AudioEngine:
         self.last_spoken_text = ""
         self.last_spoken_time = 0
 
-        # Uruchomienie pętli TTS i wątku STT
         self.tts_thread = threading.Thread(target=self._tts_worker, daemon=True)
         self.tts_thread.start()
         self.voice_thread = threading.Thread(target=self.voice_listener, daemon=True)
@@ -45,6 +42,15 @@ class AudioEngine:
                 print("Błąd TTS:", e)
             finally:
                 self.tts_queue.task_done()
+
+    def clear_tts_queue(self):
+        while True:
+            try:
+                self.tts_queue.get_nowait()
+                self.tts_queue.task_done()
+            except queue.Empty:
+                break
+
     def process_tts_queue(self):
         if not self.tts_queue.empty():
             text = self.tts_queue.get()
@@ -56,7 +62,7 @@ class AudioEngine:
                 print("Błąd TTS:", e)
         self.window.after(100, self.process_tts_queue)
 
-    def speak(self, text):
+    def speak(self, text, clear_queue=False):
         now = time.time()
         text = str(text)
 
@@ -72,6 +78,9 @@ class AudioEngine:
             except Exception as e:
                 print("Błąd Beep:", e)
             return
+
+        if clear_queue:
+            self.clear_tts_queue()
 
         self.tts_queue.put(text)
 
